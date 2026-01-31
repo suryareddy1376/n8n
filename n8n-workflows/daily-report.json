@@ -1,0 +1,339 @@
+{
+  "name": "Daily Analytics Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Every Day at 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/analytics/dashboard",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-stats",
+      "name": "Fetch Dashboard Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 250],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/analytics/departments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-dept-stats",
+      "name": "Fetch Department Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-data",
+      "name": "Merge Stats",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const dashboardStats = $input.all()[0].json.data;\nconst deptStats = $input.all()[1]?.json?.data || [];\n\nconst today = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\n// Calculate key metrics\nconst slaComplianceStatus = dashboardStats.sla_compliance_rate >= 90 \n  ? '✅ Excellent' \n  : dashboardStats.sla_compliance_rate >= 75 \n    ? '⚠️ Good' \n    : '🔴 Needs Attention';\n\n// Find worst performing department\nlet worstDept = null;\nlet bestDept = null;\nif (deptStats.length > 0) {\n  const sorted = [...deptStats].sort((a, b) => b.breached_complaints - a.breached_complaints);\n  worstDept = sorted[0];\n  bestDept = sorted[sorted.length - 1];\n}\n\n// Build report\nconst report = {\n  subject: `📊 Daily Complaint System Report - ${today}`,\n  summary: {\n    total_complaints: dashboardStats.total_complaints,\n    complaints_today: dashboardStats.complaints_today,\n    pending_review: dashboardStats.pending_review,\n    in_progress: dashboardStats.in_progress,\n    resolved_today: dashboardStats.resolved || 0,\n    sla_breached: dashboardStats.sla_breached,\n    sla_compliance_rate: Math.round(dashboardStats.sla_compliance_rate || 0),\n    sla_status: slaComplianceStatus,\n    avg_resolution_hours: Math.round(dashboardStats.avg_resolution_hours || 0)\n  },\n  departments: deptStats.map(d => ({\n    name: d.department_name,\n    total: d.total_complaints,\n    open: d.open_complaints,\n    breached: d.breached_complaints,\n    avg_hours: Math.round(d.avg_resolution_hours || 0)\n  })),\n  highlights: {\n    worst_performing: worstDept ? worstDept.department_name : 'N/A',\n    best_performing: bestDept ? bestDept.department_name : 'N/A'\n  },\n  generated_at: new Date().toISOString()\n};\n\n// Build HTML email content\nconst htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .header { background: #2563eb; color: white; padding: 20px; text-align: center; }\n    .content { padding: 20px; }\n    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }\n    .metric { background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; }\n    .metric-value { font-size: 28px; font-weight: bold; color: #1f2937; }\n    .metric-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }\n    .table { width: 100%; border-collapse: collapse; margin: 20px 0; }\n    .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }\n    .table th { background: #f9fafb; font-weight: 600; }\n    .alert { padding: 15px; border-radius: 8px; margin: 15px 0; }\n    .alert-warning { background: #fef3c7; border-left: 4px solid #f59e0b; }\n    .alert-success { background: #d1fae5; border-left: 4px solid #10b981; }\n    .footer { background: #f9fafb; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; }\n  </style>\n</head>\n<body>\n  <div class=\"header\">\n    <h1>📊 Daily Report</h1>\n    <p>${today}</p>\n  </div>\n  <div class=\"content\">\n    <h2>System Overview</h2>\n    <div class=\"metric-grid\">\n      <div class=\"metric\">\n        <div class=\"metric-value\">${report.summary.complaints_today}</div>\n        <div class=\"metric-label\">Today's Complaints</div>\n      </div>\n      <div class=\"metric\">\n        <div class=\"metric-value\">${report.summary.pending_review}</div>\n        <div class=\"metric-label\">Pending Review</div>\n      </div>\n      <div class=\"metric\">\n        <div class=\"metric-value\">${report.summary.sla_compliance_rate}%</div>\n        <div class=\"metric-label\">SLA Compliance</div>\n      </div>\n      <div class=\"metric\">\n        <div class=\"metric-value\">${report.summary.sla_breached}</div>\n        <div class=\"metric-label\">SLA Breached</div>\n      </div>\n    </div>\n    \n    <div class=\"alert ${report.summary.sla_compliance_rate >= 75 ? 'alert-success' : 'alert-warning'}\">\n      <strong>SLA Status:</strong> ${report.summary.sla_status}\n    </div>\n    \n    <h2>Department Performance</h2>\n    <table class=\"table\">\n      <thead>\n        <tr>\n          <th>Department</th>\n          <th>Total</th>\n          <th>Open</th>\n          <th>Breached</th>\n          <th>Avg Resolution</th>\n        </tr>\n      </thead>\n      <tbody>\n        ${report.departments.map(d => `\n          <tr>\n            <td>${d.name}</td>\n            <td>${d.total}</td>\n            <td>${d.open}</td>\n            <td style=\"color: ${d.breached > 0 ? '#dc2626' : '#059669'}\">${d.breached}</td>\n            <td>${d.avg_hours}h</td>\n          </tr>\n        `).join('')}\n      </tbody>\n    </table>\n  </div>\n  <div class=\"footer\">\n    <p>Generated automatically by the Complaint Management System</p>\n    <p>Report generated at ${report.generated_at}</p>\n  </div>\n</body>\n</html>\n`;\n\nreturn {\n  report,\n  html_content: htmlContent,\n  plain_text: `Daily Report - ${today}\\n\\nToday's Complaints: ${report.summary.complaints_today}\\nPending Review: ${report.summary.pending_review}\\nSLA Compliance: ${report.summary.sla_compliance_rate}%\\nSLA Breached: ${report.summary.sla_breached}\\n\\nGenerated at ${report.generated_at}`\n};"
+      },
+      "id": "generate-report",
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/webhooks/send-email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipients",
+              "value": "[\"admin\"]"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $json.report.subject }}"
+            },
+            {
+              "name": "html_content",
+              "value": "={{ $json.html_content }}"
+            },
+            {
+              "name": "plain_text",
+              "value": "={{ $json.plain_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-report",
+      "name": "Send Report Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.report.summary.sla_breached }}",
+              "operation": "larger",
+              "value2": 5
+            }
+          ]
+        }
+      },
+      "id": "check-critical",
+      "name": "Critical Breaches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/webhooks/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "critical_alert"
+            },
+            {
+              "name": "recipients",
+              "value": "[\"admin\", \"executive\"]"
+            },
+            {
+              "name": "message",
+              "value": "ALERT: {{ $json.report.summary.sla_breached }} SLA breaches detected. Immediate attention required."
+            },
+            {
+              "name": "priority",
+              "value": "critical"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "critical-alert",
+      "name": "Send Critical Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 250],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/analytics/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "daily_report_generated"
+            },
+            {
+              "name": "data",
+              "value": "={{ JSON.stringify($json.report) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-report",
+      "name": "Log Report Generation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Day at 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Fetch Dashboard Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Department Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Dashboard Stats": {
+      "main": [
+        [
+          {
+            "node": "Merge Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Department Stats": {
+      "main": [
+        [
+          {
+            "node": "Merge Stats",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Stats": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Send Report Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Report Email": {
+      "main": [
+        [
+          {
+            "node": "Critical Breaches?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Critical Breaches?": {
+      "main": [
+        [
+          {
+            "node": "Send Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Report Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Critical Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Report Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "complaint-management"
+    },
+    {
+      "name": "analytics"
+    },
+    {
+      "name": "production"
+    }
+  ],
+  "triggerCount": 1,
+  "active": true,
+  "pinData": {}
+}

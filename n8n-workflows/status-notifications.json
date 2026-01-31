@@ -1,0 +1,383 @@
+{
+  "name": "Status Change Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "status-change",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Status Change Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "status-change-webhook"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Determine notification recipients and message based on status\nconst payload = $input.item.json.payload;\nconst newStatus = payload.new_status;\nconst oldStatus = payload.old_status;\nconst complaintId = payload.complaint_id;\nconst userId = payload.user_id;\n\nlet recipients = [];\nlet notificationType = 'status_update';\nlet message = '';\nlet priority = 'normal';\nlet channels = ['in_app'];\n\nswitch (newStatus) {\n  case 'approved':\n    recipients = [userId];\n    message = `Your complaint #${complaintId.slice(0, 8)} has been approved and is being routed to the appropriate department.`;\n    channels = ['in_app', 'email'];\n    break;\n    \n  case 'assigned':\n    recipients = [userId, payload.assigned_to];\n    message = `Complaint #${complaintId.slice(0, 8)} has been assigned to a department representative.`;\n    notificationType = 'assignment';\n    channels = ['in_app', 'email'];\n    break;\n    \n  case 'in_progress':\n    recipients = [userId];\n    message = `Good news! Work has begun on your complaint #${complaintId.slice(0, 8)}.`;\n    channels = ['in_app'];\n    break;\n    \n  case 'resolved':\n    recipients = [userId];\n    message = `Your complaint #${complaintId.slice(0, 8)} has been resolved. Please provide feedback on your experience.`;\n    notificationType = 'resolution';\n    priority = 'high';\n    channels = ['in_app', 'email', 'sms'];\n    break;\n    \n  case 'rejected':\n    recipients = [userId];\n    message = `Your complaint #${complaintId.slice(0, 8)} could not be processed. Reason: ${payload.notes || 'Not specified'}`;\n    notificationType = 'rejection';\n    channels = ['in_app', 'email'];\n    break;\n    \n  case 'escalated':\n    recipients = ['admin', payload.department_head];\n    message = `ESCALATION: Complaint #${complaintId.slice(0, 8)} has been escalated.`;\n    notificationType = 'escalation';\n    priority = 'critical';\n    channels = ['in_app', 'email', 'sms'];\n    break;\n    \n  case 'closed':\n    recipients = [userId];\n    message = `Complaint #${complaintId.slice(0, 8)} has been closed. Thank you for using our service.`;\n    channels = ['in_app', 'email'];\n    break;\n    \n  default:\n    recipients = [userId];\n    message = `Status update for complaint #${complaintId.slice(0, 8)}: ${newStatus.replace('_', ' ')}`;\n}\n\nreturn {\n  complaint_id: complaintId,\n  recipients: recipients.filter(r => r),\n  notification_type: notificationType,\n  message,\n  priority,\n  channels,\n  old_status: oldStatus,\n  new_status: newStatus,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "process-notification",
+      "name": "Process Notification Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.channels }}",
+              "operation": "contains",
+              "value2": "email"
+            }
+          ]
+        }
+      },
+      "id": "check-email",
+      "name": "Send Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/webhooks/send-email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipients",
+              "value": "={{ JSON.stringify($json.recipients) }}"
+            },
+            {
+              "name": "subject",
+              "value": "Complaint Update: {{ $json.notification_type }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "complaint_id",
+              "value": "={{ $json.complaint_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [950, 150],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.channels }}",
+              "operation": "contains",
+              "value2": "sms"
+            }
+          ]
+        }
+      },
+      "id": "check-sms",
+      "name": "Send SMS?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 350]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/webhooks/send-sms",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipients",
+              "value": "={{ JSON.stringify($json.recipients) }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "priority",
+              "value": "={{ $json.priority }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-sms",
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [950, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/webhooks/in-app-notification",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipients",
+              "value": "={{ JSON.stringify($json.recipients) }}"
+            },
+            {
+              "name": "type",
+              "value": "={{ $json.notification_type }}"
+            },
+            {
+              "name": "title",
+              "value": "Complaint Status Update"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "complaint_id",
+              "value": "={{ $json.complaint_id }}"
+            },
+            {
+              "name": "priority",
+              "value": "={{ $json.priority }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "in-app-notify",
+      "name": "Create In-App Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "merge-notifications",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [1150, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, notification_sent: true, channels: $json.channels, timestamp: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/analytics/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "status_change"
+            },
+            {
+              "name": "complaint_id",
+              "value": "={{ $json.complaint_id }}"
+            },
+            {
+              "name": "old_status",
+              "value": "={{ $json.old_status }}"
+            },
+            {
+              "name": "new_status",
+              "value": "={{ $json.new_status }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ $json.timestamp }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-event",
+      "name": "Log Analytics Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [950, 450],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "system-auth",
+          "name": "System API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Status Change Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Notification Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Notification Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send SMS?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create In-App Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Analytics Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send SMS?": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create In-App Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "complaint-management"
+    },
+    {
+      "name": "notifications"
+    },
+    {
+      "name": "production"
+    }
+  ],
+  "triggerCount": 1,
+  "active": true,
+  "pinData": {}
+}
