@@ -1,0 +1,10 @@
+FROM n8nio/n8n:latest
+
+# Expose the n8n port
+EXPOSE 5678
+
+# Set working directory
+WORKDIR /home/node
+
+# n8n will use environment variables for configuration
+CMD ["n8n", "start"]
