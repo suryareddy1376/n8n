@@ -86,7 +86,7 @@ router.get(
     const filters = req.query;
 
     const result = await complaintService.getComplaints(
-      filters as Parameters<typeof complaintService.getComplaints>[0],
+      filters as unknown as Parameters<typeof complaintService.getComplaints>[0],
       user.id,
       user.role,
       user.department_id || undefined

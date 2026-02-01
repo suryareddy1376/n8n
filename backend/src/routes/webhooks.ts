@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { validate, webhookPayloadSchema } from '../middleware/validation.js';
@@ -12,7 +12,7 @@ import { config } from '../config/index.js';
 const router = Router();
 
 // Webhook authentication middleware
-const verifyWebhook = (req: Express.Request, _res: Express.Response, next: () => void) => {
+const verifyWebhook = (req: Request, _res: Response, next: NextFunction) => {
   const signature = req.headers['x-webhook-signature'] as string;
   const secret = req.headers['x-webhook-secret'] as string;
 

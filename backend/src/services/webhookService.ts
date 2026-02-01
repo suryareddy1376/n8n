@@ -77,7 +77,7 @@ const sendWebhook = async (
     });
 
     const duration = Date.now() - startTime;
-    const responseBody = await response.json().catch(() => ({}));
+    const responseBody = await response.json().catch(() => ({})) as Record<string, unknown>;
 
     // Log webhook call
     await logWebhook(eventType, payload, response.status, responseBody, duration);

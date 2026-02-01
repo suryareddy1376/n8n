@@ -143,7 +143,7 @@ export const getResolutionTimeByDepartment = async (): Promise<
   const byDepartment: Record<string, { totalHours: number; count: number }> = {};
 
   for (const complaint of data || []) {
-    const deptName = (complaint.department as { name: string })?.name || 'Unknown';
+    const deptName = ((complaint.department as unknown) as { name: string } | null)?.name || 'Unknown';
     const hours =
       (new Date(complaint.resolved_at!).getTime() -
         new Date(complaint.created_at).getTime()) /

@@ -270,13 +270,15 @@ export interface PaginatedResponse<T> {
 
 // Filter Types
 export interface ComplaintFilters {
-  status?: ComplaintStatus[];
+  status?: ComplaintStatus[] | ComplaintStatus;
   department_id?: string;
   urgency?: UrgencyLevel[];
   date_from?: string;
   date_to?: string;
   sla_breached?: boolean;
   search?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 // Auth Types
