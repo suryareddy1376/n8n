@@ -21,7 +21,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.BACKEND_URL }}/api/analytics/dashboard",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/analytics/dashboard",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -41,7 +41,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.BACKEND_URL }}/api/analytics/departments",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/analytics/departments",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -84,7 +84,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/send-email",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/send-email",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -143,7 +143,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/notify",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/notify",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -184,7 +184,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/analytics/events",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/analytics/events",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

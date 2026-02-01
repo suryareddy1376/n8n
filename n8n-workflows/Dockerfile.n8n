@@ -3,11 +3,9 @@ FROM n8nio/n8n:latest
 # Expose the n8n port
 EXPOSE 5678
 
-# Completely disable all task runners
+# Disable task runners (not needed for simple deployments)
 ENV N8N_RUNNERS_DISABLED=true
 ENV N8N_RUNNERS_ENABLED=false
-ENV N8N_RUNNERS_MODE=off
 ENV EXECUTIONS_MODE=regular
-ENV N8N_SKIP_WEBHOOK_DEREGISTRATION_SHUTDOWN=true
 
 # Use the default entrypoint from the base image

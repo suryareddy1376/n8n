@@ -47,7 +47,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/send-email",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/send-email",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -106,7 +106,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/send-sms",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/send-sms",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -143,7 +143,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/in-app-notification",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/in-app-notification",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -212,7 +212,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/analytics/events",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/analytics/events",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

@@ -165,6 +165,7 @@ export const triggerComplaintRouting = async (
     return;
   }
 
+  // Send data with both 'data' and 'payload' keys for n8n compatibility
   await sendWebhook('complaint-routing', 'complaint_routing', {
     complaint_id: complaintId,
     department_id: departmentId,
@@ -173,6 +174,9 @@ export const triggerComplaintRouting = async (
     department_email: complaint.department?.escalation_email,
     urgency: complaint.urgency,
     priority_score: complaint.priority_score,
+    ai_confidence: complaint.ai_confidence,
+    is_critical_area: complaint.is_critical_area || false,
+    is_auto_approved: complaint.is_auto_approved || false,
     description: complaint.description,
     location_address: complaint.location_address,
     citizen_name: complaint.citizen?.full_name,
@@ -180,6 +184,7 @@ export const triggerComplaintRouting = async (
     citizen_phone: complaint.citizen?.phone,
     sla_deadline: complaint.sla_deadline,
     created_at: complaint.created_at,
+    status: complaint.status,
   });
 };
 

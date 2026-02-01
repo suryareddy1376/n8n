@@ -20,7 +20,7 @@
         "conditions": {
           "boolean": [
             {
-              "value1": "={{ $json.payload.is_critical }}",
+              "value1": "={{ $json.data ? $json.data.is_critical_area : $json.payload?.is_critical }}",
               "value2": true
             }
           ]
@@ -37,7 +37,7 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{ $json.payload.ai_confidence }}",
+              "value1": "={{ $json.data ? $json.data.ai_confidence : $json.payload?.ai_confidence }}",
               "operation": "largerEqual",
               "value2": 0.75
             }
@@ -53,13 +53,30 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/complaints/{{ $json.payload.complaint_id }}/approve",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/n8n",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "status_update"
+            },
+            {
+              "name": "complaint_id",
+              "value": "={{ $json.data ? $json.data.complaint_id : $json.payload?.complaint_id }}"
+            },
+            {
+              "name": "data",
+              "value": "={{ JSON.stringify({ status: 'assigned', updated_by: 'system', notes: 'Auto-approved and assigned via routing workflow' }) }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "auto-approve",
-      "name": "Auto Approve Complaint",
+      "name": "Update Status to Assigned",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1000, 350],
@@ -73,23 +90,23 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/notify",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/n8n",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "type",
-              "value": "pending_review"
+              "name": "event_type",
+              "value": "notification_sent"
             },
             {
               "name": "complaint_id",
-              "value": "={{ $json.payload.complaint_id }}"
+              "value": "={{ $json.data ? $json.data.complaint_id : $json.payload?.complaint_id }}"
             },
             {
-              "name": "message",
-              "value": "Complaint requires manual review due to low AI confidence"
+              "name": "data",
+              "value": "={{ JSON.stringify({ channel: 'admin_notification', message: 'Complaint requires manual review due to low AI confidence' }) }}"
             }
           ]
         },
@@ -110,27 +127,23 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/notify",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/n8n",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "type",
-              "value": "critical_alert"
+              "name": "event_type",
+              "value": "notification_sent"
             },
             {
               "name": "complaint_id",
-              "value": "={{ $json.payload.complaint_id }}"
+              "value": "={{ $json.data ? $json.data.complaint_id : $json.payload?.complaint_id }}"
             },
             {
-              "name": "message",
-              "value": "CRITICAL: Complaint in sensitive area requires immediate review"
-            },
-            {
-              "name": "priority",
-              "value": "critical"
+              "name": "data",
+              "value": "={{ JSON.stringify({ channel: 'critical_alert', priority: 'critical', message: 'CRITICAL: Complaint in sensitive area requires immediate review' }) }}"
             }
           ]
         },
@@ -151,27 +164,23 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL }}/api/webhooks/notify",
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/n8n",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
-              "name": "type",
-              "value": "department_assignment"
-            },
-            {
-              "name": "department_id",
-              "value": "={{ $json.department_id }}"
+              "name": "event_type",
+              "value": "notification_sent"
             },
             {
               "name": "complaint_id",
-              "value": "={{ $json.payload.complaint_id }}"
+              "value": "={{ $json.data ? $json.data.complaint_id : $json.payload?.complaint_id }}"
             },
             {
-              "name": "message",
-              "value": "New complaint assigned to your department"
+              "name": "data",
+              "value": "={{ JSON.stringify({ channel: 'department_notification', department_id: $json.data ? $json.data.department_id : $json.payload?.department_id, message: 'New complaint assigned to your department' }) }}"
             }
           ]
         },
