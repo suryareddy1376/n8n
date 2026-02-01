@@ -3,5 +3,8 @@ FROM n8nio/n8n:latest
 # Expose the n8n port
 EXPOSE 5678
 
+# Disable task runner (not needed for simple deployments)
+ENV N8N_RUNNERS_DISABLED=true
+ENV N8N_RUNNERS_MODE=internal
+
 # Use the default entrypoint from the base image
-# n8n will use environment variables for configuration
